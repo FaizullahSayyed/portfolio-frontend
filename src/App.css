@@ -1,0 +1,118 @@
+.section-atmosphere {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--section-base, #fff);
+}
+
+.section-atmosphere::before,
+.section-atmosphere::after {
+  position: absolute;
+  z-index: -1;
+  width: clamp(18rem, 42vw, 34rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(82px);
+  opacity: 0.48;
+  content: "";
+  pointer-events: none;
+}
+
+.section-atmosphere::before {
+  top: -32%;
+  left: -12%;
+  background: var(--section-blob-primary, #dcd7ff);
+  animation: section-blob-drift-one var(--blob-one-duration, 68s) ease-in-out infinite alternate;
+}
+
+.section-atmosphere::after {
+  right: -14%;
+  bottom: -38%;
+  background: var(--section-blob-secondary, #d9edff);
+  animation: section-blob-drift-two var(--blob-two-duration, 82s) ease-in-out infinite alternate;
+}
+
+.section-atmosphere--hero {
+  --section-base: #fcfbff;
+  --section-blob-primary: #ded8ff;
+  --section-blob-secondary: #d7edff;
+  --blob-one-duration: 72s;
+  --blob-two-duration: 91s;
+}
+
+.section-atmosphere--about {
+  --section-base: #fffefa;
+  --section-blob-primary: #e7dcff;
+  --section-blob-secondary: #ffe5d9;
+  --blob-one-duration: 83s;
+  --blob-two-duration: 74s;
+}
+
+.section-atmosphere--skills {
+  --section-base: #fdfdff;
+  --section-blob-primary: #dceaff;
+  --section-blob-secondary: #e7ddff;
+  --blob-one-duration: 77s;
+  --blob-two-duration: 96s;
+}
+
+.section-atmosphere--projects {
+  --section-base: #fbfaff;
+  --section-blob-primary: #ded9ff;
+  --section-blob-secondary: #d9eeff;
+  --blob-one-duration: 89s;
+  --blob-two-duration: 73s;
+}
+
+.section-atmosphere--approach {
+  --section-base: #fffdfb;
+  --section-blob-primary: #ffe9dc;
+  --section-blob-secondary: #e5ddff;
+  --blob-one-duration: 75s;
+  --blob-two-duration: 93s;
+}
+
+.section-atmosphere--contact {
+  --section-base: #fcfbff;
+  --section-blob-primary: #ded8ff;
+  --section-blob-secondary: #d7edff;
+  --blob-one-duration: 86s;
+  --blob-two-duration: 71s;
+}
+
+@keyframes section-blob-drift-one {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  35% {
+    transform: translate3d(17vw, 12vh, 0) scale(1.12);
+  }
+
+  70% {
+    transform: translate3d(31vw, -5vh, 0) scale(0.94);
+  }
+}
+
+@keyframes section-blob-drift-two {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+
+  30% {
+    transform: translate3d(-19vw, -13vh, 0) scale(0.92);
+  }
+
+  68% {
+    transform: translate3d(-33vw, 7vh, 0) scale(1.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-atmosphere::before,
+  .section-atmosphere::after {
+    animation: none;
+  }
+}
