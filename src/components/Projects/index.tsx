@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FiEdit2, FiLayers, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 
-const PROJECTS_API_URL = 'https://portfolio-backend-gray-tau.vercel.app/api/projects';
+const PROJECTS_API_URL = 'https://portfolio-backend-gray-tau.vercel.app';
 
 type ApiProject = {
   id: string;
