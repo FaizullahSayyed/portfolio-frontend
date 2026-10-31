@@ -56,12 +56,17 @@ function isProject(value: unknown): value is ApiProject {
 }
 
 async function readResponse<T>(response: Response): Promise<T> {
+  const responseText = await response.text();
   let payload: unknown;
 
-  try {
-    payload = await response.json();
-  } catch {
-    throw new Error(`The projects API returned an invalid response (${response.status}).`);
+  if (responseText) {
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      if (response.ok) {
+        throw new Error(`The projects API returned an invalid response (${response.status}).`);
+      }
+    }
   }
 
   if (!response.ok) {
@@ -69,7 +74,7 @@ async function readResponse<T>(response: Response): Promise<T> {
       payload && typeof payload === 'object' && 'message' in payload &&
       typeof payload.message === 'string'
         ? payload.message
-        : `The request failed (${response.status}).`;
+        : `The request failed (${response.status}${response.statusText ? ` ${response.statusText}` : ''}).`;
     throw new Error(message);
   }
 
@@ -224,9 +229,10 @@ export default function Projects() {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const password = String(formData.get('masterPassword') ?? '');
-    const action = formData.get('action');
+    const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    const isDelete = submitter instanceof HTMLButtonElement && submitter.value === 'delete';
 
-    if (action === 'delete') {
+    if (isDelete) {
       if (!editor || editor.mode !== 'edit') return;
       if (!password) {
         setFormError('Master password is required.');
