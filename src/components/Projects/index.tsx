@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FiEdit2, FiLayers, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 
-const PROJECTS_API_URL = 'https://portfolio-backend-gray-tau.vercel.app/api/projects';
+const PROJECTS_API_URL = import.meta.env.DEV
+  ? 'http://localhost:3002/api/projects'
+  : '/api/projects';
 
 type ApiProject = {
   id: string;
@@ -30,7 +32,7 @@ async function requestProjectsApi(url: string, init?: RequestInit): Promise<Resp
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error(
-        'Unable to reach the projects API. Make sure the backend is running on port 3002 and allows this site through CORS.',
+        'Unable to reach the projects API. Check the backend connection and its Vercel rewrite configuration.',
       );
     }
 
