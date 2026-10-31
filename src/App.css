@@ -80,6 +80,78 @@
   --blob-two-duration: 71s;
 }
 
+.contact-social-orbit {
+  position: relative;
+  width: min(21rem, calc(100vw - 2.25rem));
+  height: min(21rem, calc(100vw - 2.25rem));
+  --contact-social-orbit-radius: calc((min(21rem, 100vw - 2.25rem) - 6.5rem) / 2);
+}
+
+.contact-social-orbit__link,
+.contact-social-orbit__center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  width: 6.5rem;
+  height: 6.5rem;
+  margin: -3.25rem 0 0 -3.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 9999px;
+  color: #fff;
+}
+
+.contact-social-orbit__link {
+  z-index: 1;
+  background: #29283a;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  animation: contact-social-orbit 17s linear infinite;
+}
+
+.contact-social-orbit__link:hover,
+.contact-social-orbit__link:focus-visible {
+  background: #45415f;
+  color: #c4c0ff;
+}
+
+.contact-social-orbit__link:focus-visible {
+  outline: 2px solid #aaa5ff;
+  outline-offset: 4px;
+}
+
+.contact-social-orbit__link--2 {
+  animation-duration: 22s;
+  animation-delay: -7s;
+}
+
+.contact-social-orbit__link--3 {
+  animation-duration: 19s;
+  animation-delay: -13s;
+}
+
+.contact-social-orbit__center {
+  width: 7rem;
+  height: 7rem;
+  transform: translate(-50%, -50%);
+  border-color: rgb(170 165 255 / 42%);
+  background: rgb(108 99 255 / 12%);
+  color: #c4c0ff;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+@keyframes contact-social-orbit {
+  from {
+    transform: rotate(0deg) translateX(var(--contact-social-orbit-radius)) rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg) translateX(var(--contact-social-orbit-radius)) rotate(-360deg);
+  }
+}
+
 @keyframes section-blob-drift-one {
   0%,
   100% {
@@ -112,7 +184,20 @@
 
 @media (prefers-reduced-motion: reduce) {
   .section-atmosphere::before,
-  .section-atmosphere::after {
+  .section-atmosphere::after,
+  .contact-social-orbit__link {
     animation: none;
+  }
+
+  .contact-social-orbit__link--1 {
+    transform: translateY(calc(0rem - var(--contact-social-orbit-radius)));
+  }
+
+  .contact-social-orbit__link--2 {
+    transform: translateX(var(--contact-social-orbit-radius));
+  }
+
+  .contact-social-orbit__link--3 {
+    transform: translateY(var(--contact-social-orbit-radius));
   }
 }
