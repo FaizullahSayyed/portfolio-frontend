@@ -1,41 +1,126 @@
-import { useEffect, useRef, useState } from 'react';
-import { FiEdit2, FiLayers, FiPlus, FiX } from 'react-icons/fi';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { FiEdit2, FiLayers, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 
-type Project = {
-  number: string;
-  label: string;
+const PROJECTS_API_URL = 'http://localhost:3002/api/projects';
+
+type ApiProject = {
+  id: string;
   title: string;
   description: string;
+  url: string | null;
+  technologies: string[];
   images: string[];
+};
+
+type Project = ApiProject & {
+  number: string;
+  label: string;
 };
 
 type ProjectEditor =
   | { mode: 'add'; images: string[] }
   | { mode: 'edit'; project: Project; images: string[] };
 
-const initialProjects: Project[] = [
-  {
-    number: '01',
+type ProjectsResponse = { data: Project[] };
+type ProjectResponse = { data: ApiProject };
+
+async function requestProjectsApi(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        'Unable to reach the projects API. Make sure the backend is running on port 3002 and allows this site through CORS.',
+      );
+    }
+
+    throw error;
+  }
+}
+
+function isProject(value: unknown): value is ApiProject {
+  if (!value || typeof value !== 'object') return false;
+  const project = value as Record<string, unknown>;
+  return (
+    typeof project.id === 'string' &&
+    typeof project.title === 'string' &&
+    typeof project.description === 'string' &&
+    (typeof project.url === 'string' || project.url === null) &&
+    Array.isArray(project.technologies) &&
+    project.technologies.every((technology) => typeof technology === 'string') &&
+    Array.isArray(project.images) &&
+    project.images.every((image) => typeof image === 'string')
+  );
+}
+
+async function readResponse<T>(response: Response): Promise<T> {
+  let payload: unknown;
+
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(`The projects API returned an invalid response (${response.status}).`);
+  }
+
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === 'object' && 'message' in payload &&
+      typeof payload.message === 'string'
+        ? payload.message
+        : `The request failed (${response.status}).`;
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
+async function fetchProjects(signal: AbortSignal): Promise<Project[]> {
+  const response = await requestProjectsApi(PROJECTS_API_URL, { signal });
+  const payload = await readResponse<ProjectsResponse>(response);
+
+  if (!Array.isArray(payload.data) || !payload.data.every(isProject)) {
+    throw new Error('The projects API returned project data in an unexpected format.');
+  }
+
+  return payload.data.map((project, index) => ({
+    ...project,
+    number: String(index + 1).padStart(2, '0'),
     label: 'Featured project',
-    title: 'Coming soon',
-    description: 'A new project story is on its way.',
-    images: [],
-  },
-  {
-    number: '02',
-    label: 'Featured project',
-    title: 'Coming soon',
-    description: 'A new project story is on its way.',
-    images: [],
-  },
-  {
-    number: '03',
-    label: 'Featured project',
-    title: 'Coming soon',
-    description: 'A new project story is on its way.',
-    images: [],
-  },
-];
+  }));
+}
+
+async function saveProject(
+  projectId: string | null,
+  password: string,
+  project: Omit<ApiProject, 'id'>,
+): Promise<ApiProject> {
+  const response = await requestProjectsApi(
+    projectId ? `${PROJECTS_API_URL}/${encodeURIComponent(projectId)}` : PROJECTS_API_URL,
+    {
+      method: projectId ? 'PUT' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Password': password,
+      },
+      body: JSON.stringify(project),
+    },
+  );
+  const payload = await readResponse<ProjectResponse>(response);
+
+  if (!isProject(payload.data)) {
+    throw new Error('The projects API returned project data in an unexpected format.');
+  }
+
+  return payload.data;
+}
+
+async function removeProject(projectId: string, password: string): Promise<void> {
+  const response = await requestProjectsApi(`${PROJECTS_API_URL}/${encodeURIComponent(projectId)}`, {
+    method: 'DELETE',
+    headers: { 'X-Master-Password': password },
+  });
+  await readResponse<{ message: string }>(response);
+}
 
 function isHttpUrl(value: string) {
   try {
@@ -102,15 +187,108 @@ function ProjectGallery({ images, number }: { images: string[]; number: string }
 }
 
 export default function Projects() {
-  const [projects] = useState(initialProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [editor, setEditor] = useState<ProjectEditor | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchProjects(controller.signal)
+      .then(setProjects)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setLoadError(error instanceof Error ? error.message : 'Unable to load projects.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (editor && dialogRef.current && !dialogRef.current.open) {
       dialogRef.current.showModal();
     }
   }, [editor]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const password = String(formData.get('masterPassword') ?? '');
+    const action = formData.get('action');
+
+    if (action === 'delete') {
+      if (!editor || editor.mode !== 'edit') return;
+      if (!password) {
+        setFormError('Master password is required.');
+        return;
+      }
+      if (!window.confirm(`Delete "${editor.project.title}"? This cannot be undone.`)) return;
+
+      setIsSaving(true);
+      setFormError(null);
+      try {
+        await removeProject(editor.project.id, password);
+        setProjects((current) => current.filter((project) => project.id !== editor.project.id));
+        dialogRef.current?.close();
+      } catch (error) {
+        setFormError(error instanceof Error ? error.message : 'Unable to delete project.');
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    const technologies = String(formData.get('technologies') ?? '')
+      .split(',')
+      .map((technology) => technology.trim())
+      .filter(Boolean);
+    const projectData = {
+      title: String(formData.get('title') ?? '').trim(),
+      description: String(formData.get('description') ?? '').trim(),
+      url: String(formData.get('url') ?? '').trim() || null,
+      technologies,
+      images: editor?.images.filter(isHttpUrl) ?? [],
+    };
+
+    setIsSaving(true);
+    setFormError(null);
+    try {
+      const savedProject = await saveProject(
+        editor?.mode === 'edit' ? editor.project.id : null,
+        password,
+        projectData,
+      );
+      setProjects((current) =>
+        editor?.mode === 'edit'
+          ? current.map((project) =>
+              project.id === savedProject.id
+                ? { ...savedProject, number: project.number, label: project.label }
+                : project,
+            )
+            : [
+                ...current,
+                {
+                  ...savedProject,
+                  number: String(current.length + 1).padStart(2, '0'),
+                  label: 'Featured project',
+                },
+              ],
+      );
+      dialogRef.current?.close();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Unable to save project.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   return (
     <section id="projects" className="section-atmosphere section-atmosphere--projects scroll-mt-20 border-y border-[#eeedf5] px-[18px] py-16 sm:px-6 sm:py-24">
@@ -127,7 +305,10 @@ export default function Projects() {
             <button
               className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#6c63ff] px-5 text-sm font-semibold text-white transition hover:bg-[#554be8] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#6c63ff]"
               type="button"
-              onClick={() => setEditor({ mode: 'add', images: [''] })}
+              onClick={() => {
+                setFormError(null);
+                setEditor({ mode: 'add', images: [''] });
+              }}
             >
               <FiPlus className="h-4 w-4" aria-hidden="true" />
               Add project
@@ -135,9 +316,18 @@ export default function Projects() {
           </div>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
+          {isLoading && <p className="text-sm text-[#666675]" role="status">Loading projects…</p>}
+          {loadError && (
+            <p className="text-sm text-[#bd4040]" role="alert">
+              {loadError}
+            </p>
+          )}
+          {!isLoading && !loadError && projects.length === 0 && (
+            <p className="text-sm text-[#666675]">No projects have been added yet.</p>
+          )}
           {projects.map((project) => (
             <article
-              key={project.number}
+              key={project.id}
               className="group overflow-hidden rounded-3xl border border-[#e9e9ef] bg-white transition hover:-translate-y-1 hover:border-[#d3d0ff] hover:shadow-[0_18px_48px_rgba(24,24,36,0.07)]"
             >
               <ProjectGallery
@@ -152,13 +342,14 @@ export default function Projects() {
                     className="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-[#666675] transition hover:bg-[#f2f0ff] hover:text-[#554be8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6c63ff]"
                     type="button"
                     aria-label={`Edit project ${project.number}`}
-                    onClick={() =>
+                    onClick={() => {
+                      setFormError(null);
                       setEditor({
                         mode: 'edit',
                         project,
                         images: project.images.length > 0 ? project.images : [''],
-                      })
-                    }
+                      });
+                    }}
                   >
                     <FiEdit2 className="h-3.5 w-3.5" aria-hidden="true" />
                     Edit
@@ -187,9 +378,9 @@ export default function Projects() {
       >
         {editor && (
           <form
-            key={editor.mode === 'edit' ? editor.project.number : 'new-project'}
+            key={editor.mode === 'edit' ? editor.project.id : 'new-project'}
             className="p-6 sm:p-8"
-            onSubmit={(event) => event.preventDefault()}
+            onSubmit={handleSubmit}
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
@@ -224,6 +415,7 @@ export default function Projects() {
                   name="title"
                   placeholder="e.g. Portfolio website"
                   defaultValue={editor.mode === 'edit' ? editor.project.title : ''}
+                  required
                 />
               </label>
               <label className="block text-sm font-medium text-[#343442]">
@@ -233,6 +425,18 @@ export default function Projects() {
                   name="description"
                   placeholder="What does this project do?"
                   defaultValue={editor.mode === 'edit' ? editor.project.description : ''}
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-[#343442]">
+                Master password
+                <input
+                  className="mt-2 min-h-11 w-full rounded-xl border border-[#e1e0e9] bg-white px-3.5 text-sm text-[#181824] outline-none transition placeholder:text-[#9898a5] focus:border-[#8c85ff] focus:ring-4 focus:ring-[#6c63ff]/10"
+                  type="password"
+                  name="masterPassword"
+                  autoComplete="current-password"
+                  placeholder="Enter master password"
+                  required
                 />
               </label>
               <label className="block text-sm font-medium text-[#343442]">
@@ -242,6 +446,7 @@ export default function Projects() {
                   type="url"
                   name="url"
                   placeholder="https://example.com"
+                  defaultValue={editor.mode === 'edit' ? editor.project.url ?? '' : ''}
                 />
               </label>
               <label className="block text-sm font-medium text-[#343442]">
@@ -251,6 +456,7 @@ export default function Projects() {
                   type="text"
                   name="technologies"
                   placeholder="e.g. React, TypeScript"
+                  defaultValue={editor.mode === 'edit' ? editor.project.technologies.join(', ') : ''}
                 />
               </label>
               <div>
@@ -330,22 +536,41 @@ export default function Projects() {
 
             <div className="mt-6 flex flex-col-reverse gap-3 border-t border-[#eeedf5] pt-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="m-0 text-xs leading-5 text-[#777687]">
-                Saving will be available when project management is connected.
+                Your master password is only sent with this request and is not stored.
               </p>
+              {formError && (
+                <p className="text-sm text-[#bd4040]" role="alert">
+                  {formError}
+                </p>
+              )}
               <div className="flex gap-3 sm:shrink-0">
+                {editor.mode === 'edit' && (
+                  <button
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-[#f1caca] px-4 text-sm font-medium text-[#bd4040] transition hover:bg-[#fff1f1] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#bd4040] disabled:cursor-not-allowed disabled:opacity-60"
+                    type="submit"
+                    name="action"
+                    value="delete"
+                    formNoValidate
+                    disabled={isSaving}
+                  >
+                    <FiTrash2 className="h-4 w-4" aria-hidden="true" />
+                    Delete
+                  </button>
+                )}
                 <button
                   className="min-h-10 rounded-full border border-[#e1e0e9] px-4 text-sm font-medium text-[#555563] transition hover:bg-[#f7f6ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6c63ff]"
                   type="button"
+                  disabled={isSaving}
                   onClick={() => dialogRef.current?.close()}
                 >
                   Cancel
                 </button>
                 <button
-                  className="min-h-10 cursor-not-allowed rounded-full bg-[#aaa5ff] px-4 text-sm font-semibold text-white"
+                  className="min-h-10 rounded-full bg-[#6c63ff] px-4 text-sm font-semibold text-white transition hover:bg-[#554be8] disabled:cursor-not-allowed disabled:opacity-60"
                   type="submit"
-                  disabled
+                  disabled={isSaving}
                 >
-                  {editor.mode === 'add' ? 'Add project' : 'Save changes'}
+                  {isSaving ? 'Saving…' : editor.mode === 'add' ? 'Add project' : 'Save changes'}
                 </button>
               </div>
             </div>
