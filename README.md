@@ -1,5 +1,32 @@
 # React + TypeScript + Vite
 
+## Run with Docker
+
+Build the production frontend image:
+
+```sh
+docker build -t portfolio-frontend:latest .
+```
+
+Run it on port 8080:
+
+```sh
+docker run --rm -p 8080:80 portfolio-frontend:latest
+```
+
+The container serves the built frontend through Nginx, supports client-side route
+fallback, and proxies `/api/*` requests to
+`https://portfolio-backend-gray-tau.vercel.app` by default. To use a different
+backend, set `API_UPSTREAM` to its origin when starting the container:
+
+```sh
+docker run --rm -p 8080:80 \
+  -e API_UPSTREAM=https://your-backend.example.com \
+  portfolio-frontend:latest
+```
+
+The image is for the frontend only; it does not contain or run the backend.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:
