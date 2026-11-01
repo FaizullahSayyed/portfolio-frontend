@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FiEdit2, FiLayers, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { SiDocker, SiGithub } from 'react-icons/si';
 
-const PROJECTS_API_URL = import.meta.env.DEV
-  ? 'http://localhost:3002/api/projects'
-  : '/api/projects';
+const PROJECTS_API_URL = '/api/projects';
 
 type ApiProject = {
   id: string;
   title: string;
   description: string;
   url: string | null;
+  githubUrl?: string | null;
+  dockerUrl?: string | null;
   technologies: string[];
   images: string[];
 };
@@ -32,7 +33,7 @@ async function requestProjectsApi(url: string, init?: RequestInit): Promise<Resp
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error(
-        'Unable to reach the projects API. Check the backend connection and its Vercel rewrite configuration.',
+        'Unable to reach the projects API. Check the backend connection and the API proxy or deployment rewrite configuration.',
       );
     }
 
@@ -48,6 +49,12 @@ function isProject(value: unknown): value is ApiProject {
     typeof project.title === 'string' &&
     typeof project.description === 'string' &&
     (typeof project.url === 'string' || project.url === null) &&
+    (project.githubUrl === undefined ||
+      typeof project.githubUrl === 'string' ||
+      project.githubUrl === null) &&
+    (project.dockerUrl === undefined ||
+      typeof project.dockerUrl === 'string' ||
+      project.dockerUrl === null) &&
     Array.isArray(project.technologies) &&
     project.technologies.every((technology) => typeof technology === 'string') &&
     Array.isArray(project.images) &&
@@ -101,17 +108,43 @@ async function saveProject(
   password: string,
   project: Omit<ApiProject, 'id'>,
 ): Promise<ApiProject> {
-  const response = await requestProjectsApi(
-    projectId ? `${PROJECTS_API_URL}/${encodeURIComponent(projectId)}` : PROJECTS_API_URL,
-    {
-      method: projectId ? 'PUT' : 'POST',
+  const isUpdate = projectId !== null;
+  const url = isUpdate
+    ? `${PROJECTS_API_URL}/${encodeURIComponent(projectId)}`
+    : PROJECTS_API_URL;
+  const method = isUpdate ? 'PUT' : 'POST';
+
+  if (isUpdate) {
+    console.info('[Projects API] Update request', { method, url, payload: project });
+  }
+
+  let response: Response;
+  try {
+    response = await requestProjectsApi(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
         'X-Master-Password': password,
       },
       body: JSON.stringify(project),
-    },
-  );
+    });
+  } catch (error) {
+    if (isUpdate) console.error('[Projects API] Update request failed', error);
+    throw error;
+  }
+
+  if (isUpdate) {
+    try {
+      console.info('[Projects API] Update response', {
+        status: response.status,
+        statusText: response.statusText,
+        body: await response.clone().text(),
+      });
+    } catch (error) {
+      console.warn('[Projects API] Unable to read update response for diagnostics', error);
+    }
+  }
+
   const payload = await readResponse<ProjectResponse>(response);
 
   if (!isProject(payload.data)) {
@@ -262,6 +295,8 @@ export default function Projects() {
       title: String(formData.get('title') ?? '').trim(),
       description: String(formData.get('description') ?? '').trim(),
       url: String(formData.get('url') ?? '').trim() || null,
+      githubUrl: String(formData.get('githubUrl') ?? '').trim() || null,
+      dockerUrl: String(formData.get('dockerUrl') ?? '').trim() || null,
       technologies,
       images: editor?.images.filter(isHttpUrl) ?? [],
     };
@@ -365,6 +400,34 @@ export default function Projects() {
                 </div>
                 <h3 className="mt-2 text-xl font-semibold text-[#181824]">{project.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-[#666675]">{project.description}</p>
+                {(isHttpUrl(project.githubUrl ?? '') || isHttpUrl(project.dockerUrl ?? '')) && (
+                  <div className="mt-4 flex gap-2">
+                    {isHttpUrl(project.githubUrl ?? '') && (
+                      <a
+                        className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#e9e9ef] px-3 text-sm font-medium text-[#343442] transition hover:border-[#d3d0ff] hover:bg-[#f7f6ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6c63ff]"
+                        href={project.githubUrl ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`View ${project.title} on GitHub`}
+                      >
+                        <SiGithub className="h-4 w-4" aria-hidden="true" />
+                        GitHub
+                      </a>
+                    )}
+                    {isHttpUrl(project.dockerUrl ?? '') && (
+                      <a
+                        className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#e9e9ef] px-3 text-sm font-medium text-[#343442] transition hover:border-[#d3d0ff] hover:bg-[#f7f6ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6c63ff]"
+                        href={project.dockerUrl ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`View ${project.title} on Docker Hub`}
+                      >
+                        <SiDocker className="h-4 w-4" aria-hidden="true" />
+                        Docker
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </article>
           ))}
@@ -455,6 +518,26 @@ export default function Projects() {
                   name="url"
                   placeholder="https://example.com"
                   defaultValue={editor.mode === 'edit' ? editor.project.url ?? '' : ''}
+                />
+              </label>
+              <label className="block text-sm font-medium text-[#343442]">
+                GitHub URL
+                <input
+                  className="mt-2 min-h-11 w-full rounded-xl border border-[#e1e0e9] bg-white px-3.5 text-sm text-[#181824] outline-none transition placeholder:text-[#9898a5] focus:border-[#8c85ff] focus:ring-4 focus:ring-[#6c63ff]/10"
+                  type="url"
+                  name="githubUrl"
+                  placeholder="https://github.com/username/repository"
+                  defaultValue={editor.mode === 'edit' ? editor.project.githubUrl ?? '' : ''}
+                />
+              </label>
+              <label className="block text-sm font-medium text-[#343442]">
+                Docker URL
+                <input
+                  className="mt-2 min-h-11 w-full rounded-xl border border-[#e1e0e9] bg-white px-3.5 text-sm text-[#181824] outline-none transition placeholder:text-[#9898a5] focus:border-[#8c85ff] focus:ring-4 focus:ring-[#6c63ff]/10"
+                  type="url"
+                  name="dockerUrl"
+                  placeholder="https://hub.docker.com/r/username/image"
+                  defaultValue={editor.mode === 'edit' ? editor.project.dockerUrl ?? '' : ''}
                 />
               </label>
               <label className="block text-sm font-medium text-[#343442]">
