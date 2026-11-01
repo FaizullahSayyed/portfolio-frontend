@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { FiArrowDown, FiArrowUpRight } from 'react-icons/fi';
 import heroPortrait from '../../assets/hero-cloudinary.png';
 
 export default function Hero() {
+  const [shouldPlayVideo] = useState(
+    () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+
   return (
     <section
       id="home"
@@ -37,15 +42,27 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="relative mx-auto flex aspect-square w-full max-w-[390px] items-center justify-center rounded-[2rem] border border-[#eeedf5] bg-[#f7f6ff] p-8 sm:p-12">
+        <div className="relative mx-auto flex aspect-square w-[90vw] items-center justify-center overflow-hidden rounded-[2rem] border border-[#eeedf5] bg-[#f7f6ff] md:w-full">
           <div
             className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-[#dedbff]/70 blur-3xl"
             aria-hidden="true"
           />
-          <img
-            className="relative h-auto w-full max-w-[300px]"
-            src={heroPortrait}
-            alt="Portrait of Faizulla Syed"
+          <video
+            className="relative aspect-video h-auto w-full object-cover"
+            src="/portfolio-preview.mp4"
+            poster={heroPortrait}
+            autoPlay={shouldPlayVideo}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-label="Portfolio introduction video"
+            onLoadedMetadata={(event) => {
+              const duration = event.currentTarget.duration;
+              if (Number.isFinite(duration) && duration > 0) {
+                event.currentTarget.playbackRate = Math.min(1, duration / 12);
+              }
+            }}
           />
           <div className="absolute right-4 bottom-5 rounded-2xl border border-[#eeedf5] bg-white px-4 py-3 shadow-[0_12px_40px_rgba(24,24,36,0.07)] sm:right-6 sm:bottom-7">
             <p className="text-xs font-medium tracking-wide text-[#666675]">DESIGN · BUILD · REFINE</p>

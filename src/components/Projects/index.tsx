@@ -171,24 +171,11 @@ function isHttpUrl(value: string) {
   }
 }
 
-function ProjectGallery({
-  images,
-  number,
-  videoSrc,
-}: {
-  images: string[];
-  number: string;
-  videoSrc?: string;
-}) {
+function ProjectGallery({ images, number }: { images: string[]; number: string }) {
   const [activeImage, setActiveImage] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (
-      videoSrc ||
-      images.length < 2 ||
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
+    if (images.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       return;
     }
 
@@ -197,41 +184,15 @@ function ProjectGallery({
     }, 5000);
 
     return () => window.clearInterval(intervalId);
-  }, [images.length, videoSrc]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    void video.play().catch((error: unknown) => {
-      console.error(`Unable to play project ${number} preview video.`, error);
-    });
-  }, [number, videoSrc]);
+  }, [images.length]);
 
   return (
     <div
       className="relative flex aspect-[1.35] items-center justify-center overflow-hidden bg-[#f1f0ff]"
       role="group"
-      aria-label={`Project ${number} preview`}
+      aria-label={`Project ${number} images`}
     >
-      {videoSrc ? (
-        <video
-          ref={videoRef}
-          className="absolute inset-0 h-full w-full object-cover"
-          src={videoSrc}
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          aria-label={`Project ${number} preview video`}
-          onLoadedMetadata={(event) => {
-            const duration = event.currentTarget.duration;
-            if (Number.isFinite(duration) && duration > 0) {
-              event.currentTarget.playbackRate = Math.min(1, duration / 12);
-            }
-          }}
-        />
-      ) : images.length > 0 ? (
+      {images.length > 0 ? (
         <img
           className="absolute inset-0 h-full w-full object-cover"
           src={images[activeImage]}
@@ -413,10 +374,9 @@ export default function Projects() {
               className="group overflow-hidden rounded-3xl border border-[#e9e9ef] bg-white transition hover:-translate-y-1 hover:border-[#d3d0ff] hover:shadow-[0_18px_48px_rgba(24,24,36,0.07)]"
             >
               <ProjectGallery
-                key={`${project.images.join('|')}|${project.title === 'Portfolio Website' ? 'portfolio-video' : ''}`}
+                key={project.images.join('|')}
                 images={project.images}
                 number={project.number}
-                videoSrc={project.title === 'Portfolio Website' ? '/portfolio-preview.mp4' : undefined}
               />
               <div className="p-6">
                 <div className="flex items-center justify-between gap-3">
