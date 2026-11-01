@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { FiEdit2, FiLayers, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
+import { FiEdit2, FiExternalLink, FiLayers, FiPlus, FiTrash2, FiX } from 'react-icons/fi';
 import { SiDocker, SiGithub } from 'react-icons/si';
 
 const PROJECTS_API_URL = '/api/projects';
@@ -400,8 +400,22 @@ export default function Projects() {
                 </div>
                 <h3 className="mt-2 text-xl font-semibold text-[#181824]">{project.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-[#666675]">{project.description}</p>
-                {(isHttpUrl(project.githubUrl ?? '') || isHttpUrl(project.dockerUrl ?? '')) && (
+                {(isHttpUrl(project.url ?? '') ||
+                  isHttpUrl(project.githubUrl ?? '') ||
+                  isHttpUrl(project.dockerUrl ?? '')) && (
                   <div className="mt-4 flex gap-2">
+                    {isHttpUrl(project.url ?? '') && (
+                      <a
+                        className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#e9e9ef] px-3 text-sm font-medium text-[#343442] transition hover:border-[#d3d0ff] hover:bg-[#f7f6ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6c63ff]"
+                        href={project.url ?? undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`Visit ${project.title} project`}
+                      >
+                        <FiExternalLink className="h-4 w-4" aria-hidden="true" />
+                        Live site
+                      </a>
+                    )}
                     {isHttpUrl(project.githubUrl ?? '') && (
                       <a
                         className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[#e9e9ef] px-3 text-sm font-medium text-[#343442] transition hover:border-[#d3d0ff] hover:bg-[#f7f6ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6c63ff]"
